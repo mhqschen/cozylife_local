@@ -10,6 +10,8 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     PERCENTAGE,
     EntityCategory,
+    STATE_UNAVAILABLE,
+    STATE_UNKNOWN,
     UnitOfElectricCurrent,
     UnitOfElectricPotential,
     UnitOfEnergy,
@@ -18,6 +20,7 @@ from homeassistant.const import (
 )
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity import DeviceInfo
+from homeassistant.helpers.restore_state import RestoreEntity
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import (
@@ -31,9 +34,9 @@ from .const import (
     PLUG_VOLTAGE,
 )
 from .coordinator import CozyLifeCoordinator
+from .discovery import get_model_info
 
 _LOGGER = logging.getLogger(__name__)
-
 
 async def async_setup_entry(
     hass: HomeAssistant,
@@ -46,8 +49,11 @@ async def async_setup_entry(
     if not coordinator.device.dpid:
         return
 
-    entities = []
-    dpids = coordinator.device.dpid
+    entities = [CozyLifeIPAddressSensor(coordinator)]
+    dpids = set(coordinator.device.dpid)
+    model_info = get_model_info(coordinator.device.pid)
+    if model_info:
+        dpids.update(model_info.dpids)
 
     if coordinator.classification.is_environment_sensor:
         entities.extend(
@@ -84,7 +90,6 @@ async def async_setup_entry(
                 device_class=SensorDeviceClass.POWER,
                 state_class=SensorStateClass.MEASUREMENT,
                 native_unit_of_measurement=UnitOfPower.WATT,
-                scale=10,
             ),
             PlugSensorDescription(
                 dpid=PLUG_VOLTAGE,
@@ -93,10 +98,8 @@ async def async_setup_entry(
                 device_class=SensorDeviceClass.VOLTAGE,
                 state_class=SensorStateClass.MEASUREMENT,
                 native_unit_of_measurement=UnitOfElectricPotential.VOLT,
-                scale=10,
             ),
         ]
-
         entities.extend(
             CozyLifePlugSensor(coordinator, description)
             for description in plug_sensor_descriptions
@@ -120,10 +123,11 @@ class PlugSensorDescription:
         dpid: str,
         key: str,
         name: str,
-        device_class: SensorDeviceClass,
-        state_class: SensorStateClass,
-        native_unit_of_measurement: str,
+        device_class: SensorDeviceClass | None,
+        state_class: SensorStateClass | None,
+        native_unit_of_measurement: str | None,
         scale: int = 1,
+        entity_category: EntityCategory | None = None,
     ) -> None:
         self.dpid = dpid
         self.key = key
@@ -132,28 +136,94 @@ class PlugSensorDescription:
         self.state_class = state_class
         self.native_unit_of_measurement = native_unit_of_measurement
         self.scale = scale
+        self.entity_category = entity_category
 
 
-class CozyLifeSensorBase(CoordinatorEntity[CozyLifeCoordinator], SensorEntity):
+def _device_info(coordinator: CozyLifeCoordinator) -> DeviceInfo:
+    """Return shared Home Assistant device info for CozyLife entities."""
+    return DeviceInfo(
+        identifiers={(DOMAIN, coordinator.device.device_id)},
+        name=coordinator.device.device_model_name,
+        manufacturer="CozyLife",
+        model=coordinator.device.pid,
+    )
+
+
+class CozyLifeIPAddressSensor(CoordinatorEntity[CozyLifeCoordinator], SensorEntity):
+    """Diagnostic sensor exposing the device IP address."""
+
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_icon = "mdi:ip-network"
+
+    def __init__(self, coordinator: CozyLifeCoordinator) -> None:
+        super().__init__(coordinator)
+        self._attr_name = f"{coordinator.device.device_model_name} IP Address"
+        self._attr_unique_id = f"{coordinator.device.device_id}_ip_address"
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        return _device_info(self.coordinator)
+
+    @property
+    def native_value(self) -> str:
+        return self.coordinator.device.ip_address
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        self.async_write_ha_state()
+
+
+class CozyLifeSensorBase(
+    CoordinatorEntity[CozyLifeCoordinator],
+    SensorEntity,
+    RestoreEntity,
+):
     """Base class for CozyLife sensors."""
 
     def __init__(self, coordinator: CozyLifeCoordinator, entry: ConfigEntry, sensor_type: str):
         super().__init__(coordinator)
         self._sensor_type = sensor_type
         self._attr_unique_id = f"{coordinator.device.device_id}_{sensor_type}"
+        self._last_valid_native_value: float | None = None
 
     @property
     def device_info(self) -> DeviceInfo:
-        return DeviceInfo(
-            identifiers={(DOMAIN, self.coordinator.device.device_id)},
-            name=self.coordinator.device.device_model_name,
-            manufacturer="CozyLife",
-            model=self.coordinator.device.pid,
-        )
+        return _device_info(self.coordinator)
 
     @callback
     def _handle_coordinator_update(self) -> None:
+        if (value := self._native_value_from_data()) is not None:
+            self._last_valid_native_value = value
         self.async_write_ha_state()
+
+    async def async_added_to_hass(self) -> None:
+        """Restore the last recorded value while sleeping sensors are offline."""
+        await super().async_added_to_hass()
+
+        last_state = await self.async_get_last_state()
+        if last_state is None or last_state.state in {
+            STATE_UNAVAILABLE,
+            STATE_UNKNOWN,
+        }:
+            return
+
+        try:
+            self._last_valid_native_value = float(last_state.state)
+        except (TypeError, ValueError):
+            return
+
+    def _native_value_from_data(self) -> Optional[float]:
+        """Return the current native value from coordinator data."""
+        raise NotImplementedError
+
+    @property
+    def native_value(self) -> Optional[float]:
+        value = self._native_value_from_data()
+        if value is not None:
+            self._last_valid_native_value = value
+            return value
+
+        return self._last_valid_native_value
 
 
 class CozyLifeTemperatureSensor(CozyLifeSensorBase):
@@ -167,9 +237,8 @@ class CozyLifeTemperatureSensor(CozyLifeSensorBase):
         super().__init__(coordinator, entry, "temperature")
         self._attr_name = f"{coordinator.device.device_model_name} Temperature"
 
-    @property
-    def native_value(self) -> Optional[float]:
-        raw = self.coordinator.data.get(SENSOR_TEMPERATURE)
+    def _native_value_from_data(self) -> Optional[float]:
+        raw = (self.coordinator.data or {}).get(SENSOR_TEMPERATURE)
         if raw is None:
             return None
         return round(raw / 10, 1)
@@ -186,9 +255,8 @@ class CozyLifeHumiditySensor(CozyLifeSensorBase):
         super().__init__(coordinator, entry, "humidity")
         self._attr_name = f"{coordinator.device.device_model_name} Humidity"
 
-    @property
-    def native_value(self) -> Optional[float]:
-        raw = self.coordinator.data.get(SENSOR_HUMIDITY)
+    def _native_value_from_data(self) -> Optional[float]:
+        raw = (self.coordinator.data or {}).get(SENSOR_HUMIDITY)
         if raw is None:
             return None
         return float(raw)
@@ -206,9 +274,8 @@ class CozyLifeBatterySensor(CozyLifeSensorBase):
         super().__init__(coordinator, entry, "battery")
         self._attr_name = f"{coordinator.device.device_model_name} Battery"
 
-    @property
-    def native_value(self) -> Optional[float]:
-        raw = self.coordinator.data.get(SENSOR_BATTERY)
+    def _native_value_from_data(self) -> Optional[float]:
+        raw = (self.coordinator.data or {}).get(SENSOR_BATTERY)
         if raw is None:
             return None
         return round(raw / 10, 1)
@@ -229,15 +296,11 @@ class CozyLifePlugSensor(CoordinatorEntity[CozyLifeCoordinator], SensorEntity):
         self._attr_device_class = description.device_class
         self._attr_state_class = description.state_class
         self._attr_native_unit_of_measurement = description.native_unit_of_measurement
+        self._attr_entity_category = description.entity_category
 
     @property
     def device_info(self) -> DeviceInfo:
-        return DeviceInfo(
-            identifiers={(DOMAIN, self.coordinator.device.device_id)},
-            name=self.coordinator.device.device_model_name,
-            manufacturer="CozyLife",
-            model=self.coordinator.device.pid,
-        )
+        return _device_info(self.coordinator)
 
     @property
     def native_value(self) -> Optional[float]:
