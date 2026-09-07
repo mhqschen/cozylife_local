@@ -21720,7 +21720,7 @@
             ],
             "ext": [],
             "g_u": "2021060516180022",
-            "i": "https://static-cf-cn.doiting.com/storage/images/ef692a1d7e3fa2a10dce74b5d197b46e.png",
+            "i": "https://static-cf-cn.doiting.com/storage/images/30f10f8a0d87ee6146331ccd5d10117f.png",
             "m_n": "TT",
             "mp": [
               {
@@ -22173,6 +22173,33 @@
             "pid": "qvnGI7",
             "s": 0,
             "s_u": "2021062311430029"
+          },
+          {
+            "cl": [],
+            "dpid": [
+              1
+            ],
+            "ext": [],
+            "g_u": "2026082519000001",
+            "i": "https://static-cf-cn.doiting.com/storage/images/f75583b39eefd4b7f3c5672ff1df35d8.png",
+            "m_n": "^(FLAMP).*$",
+            "mp": [
+              {
+                "i": "https://static-cf-cn.doiting.com/storage/images/7d0df70426a78320df5a9417ee528606.jpg",
+                "n": "",
+                "url": "2026082519000001"
+              }
+            ],
+            "n": "floor lamp",
+            "net": "01",
+            "p": "2",
+            "p_c_d": null,
+            "p_p_p": "Light",
+            "p_u": "",
+            "pa_u": "2025091815230001",
+            "pid": "tYmZPN",
+            "s": 0,
+            "s_u": "2026082519000001"
           }
         ],
         "n": "Light"
@@ -38222,6 +38249,98 @@
             "p_u": "",
             "pa_u": "2025091815230001",
             "pid": "0UhmjR",
+            "s": 0,
+            "s_u": "2021070311260031"
+          },
+          {
+            "cl": [],
+            "dpid": [
+              201,
+              0
+            ],
+            "ext": [],
+            "g_u": "2021060318130019",
+            "i": "https://static-cf-cn.doiting.com/storage/images/814ca5aa829acb90a09e2b60fccf71a2.jpg",
+            "m_n": "TT",
+            "mp": [
+              {
+                "i": "https://static-cf-cn.doiting.com/storage/images/c6553954784162bf5406a6b2d83390ca.png",
+                "n": "",
+                "url": "2026090516290000"
+              }
+            ],
+            "n": "AI Lamp",
+            "net": "02",
+            "p": "3",
+            "p_c_d": {
+              "1": "1"
+            },
+            "p_p_p": "Light",
+            "p_u": "",
+            "pa_u": "2025091815230001",
+            "pid": "HFyhNc",
+            "s": 0,
+            "s_u": "2021062115130027"
+          },
+          {
+            "cl": [],
+            "dpid": [
+              201,
+              202,
+              203,
+              0
+            ],
+            "ext": [],
+            "g_u": "2021060318130019",
+            "i": "https://static-cf-cn.doiting.com/storage/images/3c8307d9155c1f069d634d47322899f7.png",
+            "m_n": "TT",
+            "mp": [
+              {
+                "i": "https://static-cf-cn.doiting.com/storage/images/c6553954784162bf5406a6b2d83390ca.png",
+                "n": "",
+                "url": "2026090516290000"
+              }
+            ],
+            "n": "AI Lamp",
+            "net": "02",
+            "p": "3",
+            "p_c_d": null,
+            "p_p_p": "Light",
+            "p_u": "",
+            "pa_u": "2025091815230001",
+            "pid": "fBhCXl",
+            "s": 0,
+            "s_u": "2021062115130027"
+          },
+          {
+            "cl": [],
+            "dpid": [
+              201,
+              202,
+              203
+            ],
+            "ext": [
+              "4",
+              "5"
+            ],
+            "g_u": "1",
+            "i": "https://static-cf-cn.doiting.com/storage/images/0933c65c25887908f60a4b33ac3e9c4c.png",
+            "m_n": "TT",
+            "mp": [
+              {
+                "i": "https://static-cf-cn.doiting.com/storage/images/2dc010316e1a81b337985555d9e94bbd.jpg",
+                "n": "",
+                "url": "2026080818430007"
+              }
+            ],
+            "n": "s3",
+            "net": "02",
+            "p": "3",
+            "p_c_d": null,
+            "p_p_p": "Placeholder",
+            "p_u": "",
+            "pa_u": "2025091815230001",
+            "pid": "Eklp7l",
             "s": 0,
             "s_u": "2021070311260031"
           }
